@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Package, FolderTree, ShoppingCart, Users, Tag,
   Settings, Search, Image as ImageIcon, BarChart3, LogOut, Menu, X,
-  ChevronDown, Store, Eye, EyeOff, Loader2
+  ChevronDown, Store, Eye, EyeOff, Loader2, FileText
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@supabase/supabase-js'
@@ -18,6 +18,7 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Products', icon: Package },
   { href: '/admin/categories', label: 'Categories', icon: FolderTree },
+  { href: '/admin/pages', label: 'Pages', icon: FileText },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/admin/customers', label: 'Customers', icon: Users },
   { href: '/admin/coupons', label: 'Coupons', icon: Tag },

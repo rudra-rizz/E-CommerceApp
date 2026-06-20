@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, Search } from 'lucide-react'
+import { ChevronDown, Search, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const faqs = [
@@ -54,8 +54,19 @@ const fadeUp = {
 }
 
 export default function FAQPage() {
+  const [pageData, setPageData] = useState<{ title: string; content: string } | null>(null)
+  const [loading, setLoading] = useState(true)
   const [openIndex, setOpenIndex] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+
+  useEffect(() => {
+    fetch('/api/pages/faq')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) setPageData(data)
+      })
+      .finally(() => setLoading(false))
+  }, [])
 
   const filteredFaqs = faqs.map(cat => ({
     ...cat,
@@ -65,10 +76,18 @@ export default function FAQPage() {
     ),
   })).filter(cat => cat.questions.length > 0)
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#2563EB]" />
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-[1440px] px-6 md:px-16 py-16 md:py-24">
       <motion.div initial="hidden" animate="visible" variants={fadeUp} className="text-center mb-12">
-        <h1 className="font-serif text-3xl md:text-4xl font-bold mb-2">Frequently Asked Questions</h1>
+        <h1 className="font-serif text-3xl md:text-4xl font-bold mb-2">{pageData?.title || 'Frequently Asked Questions'}</h1>
         <p className="text-sm text-[#6B6B6B] mb-8">Find answers to common questions below.</p>
         <div className="relative max-w-md mx-auto">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B6B6B]" />
@@ -81,6 +100,16 @@ export default function FAQPage() {
           />
         </div>
       </motion.div>
+
+      {pageData?.content && (
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={fadeUp}
+          className="prose prose-sm max-w-3xl mx-auto mb-12 text-[#6B6B6B]"
+          dangerouslySetInnerHTML={{ __html: pageData.content }}
+        />
+      )}
 
       <div className="max-w-3xl mx-auto space-y-8">
         {filteredFaqs.map(category => (

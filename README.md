@@ -20,17 +20,19 @@ A production-grade e-commerce platform built with Next.js 16, TypeScript, Tailwi
 - Responsive, premium UI with Apple/Aesop-level design
 - Animated page transitions, scroll-triggered reveals, micro-interactions
 - Hero carousel with auto-rotation
-- Product catalog with categories, filters, sorting, and search
+- Product catalog with categories, filters, sorting, search, quick view modal, grid/list toggle
 - Product detail pages with image galleries, variant selectors, reviews
 - Cart drawer with animations, coupon support
 - Multi-step checkout with Razorpay payment integration
 - User accounts: auth, orders, addresses, wishlist, settings
-- Newsletter signup, contact form, FAQ, policy pages
+- Newsletter signup, contact form, FAQ, policy pages (content managed via CMS)
 
 ### Admin Panel
 - Dashboard with KPI cards, revenue charts, order/stock alerts
-- Product management with rich editor, media upload, variants
+- Product management with rich editor (TipTap), media upload, variants
 - Category management with nested tree view
+- Pages CMS — edit About, Contact, FAQ, policies with TipTap rich text editor
+- Homepage sections management — toggle visibility of hero, categories, arrivals, etc.
 - Order management with timeline, status updates, tracking
 - Customer management with order history
 - Coupon/discount management
@@ -121,6 +123,3 @@ npx vercel --prod
 ```
 
 Set all environment variables in Vercel's dashboard. No additional configuration needed.
-"# E-Commerce" 
-"# E-Commerce" 
-"# E-CommerceApp" 

@@ -212,6 +212,33 @@ export interface HeroSlide {
   is_active: boolean;
 }
 
+export interface Page {
+  id: string;
+  slug: string;
+  title: string;
+  content: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  image_url: string | null;
+  is_visible: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HomepageSection {
+  id: string;
+  section_key: string;
+  title: string | null;
+  subtitle: string | null;
+  content: string | null;
+  image_url: string | null;
+  is_visible: boolean;
+  sort_order: number;
+  settings: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CartItem {
   id: string;
   product_id: string;

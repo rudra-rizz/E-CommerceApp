@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Mail, Phone, MapPin, Clock, Send, Check } from 'lucide-react'
+import { Mail, Phone, MapPin, Clock, Send, Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -11,17 +11,49 @@ const fadeUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.6 } },
 }
 
-const contactInfo = [
+const fallbackContact = [
   { icon: Mail, label: 'Email', value: 'hello@store.com', href: 'mailto:hello@store.com' },
   { icon: Phone, label: 'Phone', value: '+1 (555) 123-4567', href: 'tel:+15551234567' },
   { icon: MapPin, label: 'Address', value: '123 Fashion Ave, New York, NY 10001' },
   { icon: Clock, label: 'Hours', value: 'Mon-Fri: 9AM-6PM EST' },
 ]
 
+const iconMap: Record<string, { icon: typeof Mail; key: string }> = {
+  email: { icon: Mail, key: 'contact_email' },
+  phone: { icon: Phone, key: 'contact_phone' },
+  address: { icon: MapPin, key: 'business_address' },
+}
+
 export default function ContactPage() {
+  const [pageData, setPageData] = useState<{ title: string; content: string; image_url: string | null } | null>(null)
+  const [siteSettings, setSiteSettings] = useState<{
+    contact_email: string | null
+    contact_phone: string | null
+    business_address: string | null
+  } | null>(null)
+  const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' })
   const [submitted, setSubmitted] = useState(false)
   const [sending, setSending] = useState(false)
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/pages/contact').then(r => r.ok ? r.json() : null),
+      fetch('/api/settings').then(r => r.ok ? r.json() : null),
+    ]).then(([page, settings]) => {
+      if (page) setPageData(page)
+      if (settings) setSiteSettings(settings)
+    }).finally(() => setLoading(false))
+  }, [])
+
+  const contactInfo = siteSettings
+    ? [
+        { icon: Mail, label: 'Email', value: siteSettings.contact_email || fallbackContact[0].value, href: `mailto:${siteSettings.contact_email || fallbackContact[0].value}` },
+        { icon: Phone, label: 'Phone', value: siteSettings.contact_phone || fallbackContact[1].value, href: `tel:${siteSettings.contact_phone?.replace(/\D/g, '') || fallbackContact[1].href?.replace('tel:', '')}` },
+        { icon: MapPin, label: 'Address', value: siteSettings.business_address || fallbackContact[2].value },
+        fallbackContact[3],
+      ]
+    : fallbackContact
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,12 +72,30 @@ export default function ContactPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-[#2563EB]" />
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-[1440px] px-6 md:px-16 py-16 md:py-24">
       <motion.div initial="hidden" animate="visible" variants={fadeUp} className="text-center mb-12">
-        <h1 className="font-serif text-3xl md:text-4xl font-bold mb-2">Get in Touch</h1>
+        <h1 className="font-serif text-3xl md:text-4xl font-bold mb-2">{pageData?.title || 'Get in Touch'}</h1>
         <p className="text-sm text-[#6B6B6B]">We&apos;d love to hear from you. Drop us a message anytime.</p>
       </motion.div>
+
+      {pageData?.content && (
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={fadeUp}
+          className="prose prose-sm max-w-3xl mx-auto mb-12 text-[#6B6B6B]"
+          dangerouslySetInnerHTML={{ __html: pageData.content }}
+        />
+      )}
 
       <div className="grid md:grid-cols-2 gap-12 max-w-4xl mx-auto">
         <motion.div initial="hidden" animate="visible" variants={fadeUp}>

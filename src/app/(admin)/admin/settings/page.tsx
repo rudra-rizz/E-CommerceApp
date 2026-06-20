@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
-import { Plus, Trash2, Upload, Image as ImageIcon, GripVertical } from 'lucide-react'
+import { Plus, Trash2, Upload, Image as ImageIcon, GripVertical, Layout, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { adminApi } from '@/lib/admin-fetch'
 import { cn, getImageUrl } from '@/lib/utils'
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast'
-import type { SiteSettings, HeroSlide } from '@/types'
+import type { SiteSettings, HeroSlide, HomepageSection } from '@/types'
 
 interface ShippingMethod {
   id?: string
@@ -78,6 +78,8 @@ export default function AdminSettings() {
   const [bannerForm, setBannerForm] = useState<Banner>({ image_url: '', text: '', link: '', is_active: true, valid_from: '', valid_to: '' })
   const [deleteSlideTarget, setDeleteSlideTarget] = useState<HeroSlide | null>(null)
   const [deleteBannerTarget, setDeleteBannerTarget] = useState<Banner | null>(null)
+  const [sections, setSections] = useState<HomepageSection[]>([])
+  const [savingSections, setSavingSections] = useState(false)
 
   useEffect(() => { loadSettings() }, [])
 
@@ -92,6 +94,11 @@ export default function AdminSettings() {
       })))
       const slides = await adminApi.select('hero_slides', [], { order: { column: 'sort_order', ascending: true } })
       setHeroSlides((slides || []) as HeroSlide[])
+      const res = await fetch('/api/admin/homepage-sections')
+      if (res.ok) {
+        const data = await res.json()
+        setSections(data as HomepageSection[])
+      }
     } finally { setLoading(false) }
   }
 
@@ -221,6 +228,28 @@ export default function AdminSettings() {
     } catch { toast('Delete failed', 'error') }
   }
 
+  const updateSection = (index: number, field: string, value: any) => {
+    const updated = [...sections]
+    updated[index] = { ...updated[index], [field]: value }
+    setSections(updated)
+  }
+
+  const saveSection = async (index: number) => {
+    const section = sections[index]
+    setSavingSections(true)
+    try {
+      const res = await fetch('/api/admin/homepage-sections', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: section.id, title: section.title, subtitle: section.subtitle, is_visible: section.is_visible }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      toast('Section saved', 'success')
+    } catch {
+      toast('Save failed', 'error')
+    } finally { setSavingSections(false) }
+  }
+
   if (loading) return (
     <div className="space-y-6">
       <Skeleton className="h-8 w-48" />
@@ -235,6 +264,7 @@ export default function AdminSettings() {
     { id: 'currency', label: 'Currency & Tax' },
     { id: 'shipping', label: 'Shipping' },
     { id: 'hero', label: 'Hero Slides' },
+    { id: 'homepage', label: 'Homepage' },
   ]
 
   return (
@@ -375,6 +405,51 @@ export default function AdminSettings() {
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => openSlideModal(slide)} className="p-1.5 bg-black/60 rounded-lg text-white"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
                       <button onClick={() => setDeleteSlideTarget(slide)} className="p-1.5 bg-black/60 rounded-lg text-white"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'homepage' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Layout className="w-5 h-5 text-[#2563EB]" />
+              <h2 className="text-base font-semibold text-[#1A1A1A]">Homepage Sections</h2>
+            </div>
+            {sections.length === 0 ? (
+              <p className="text-sm text-[#6B6B6B]">No homepage sections</p>
+            ) : (
+              <div className="space-y-3">
+                {sections.map((section, i) => (
+                  <div key={section.id} className="p-4 bg-[#F8F9FA] rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-[#6B6B6B] bg-white px-2 py-1 rounded-md border border-[rgba(0,0,0,0.06)]">{section.section_key}</span>
+                      </div>
+                      <button
+                        onClick={() => updateSection(i, 'is_visible', !section.is_visible)}
+                        className={cn('p-2 rounded-lg transition-colors', section.is_visible ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FEF2F2] text-[#DC2626]')}
+                      >
+                        {section.is_visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="Title"
+                        value={section.title || ''}
+                        onChange={e => updateSection(i, 'title', e.target.value)}
+                      />
+                      <Input
+                        label="Subtitle"
+                        value={section.subtitle || ''}
+                        onChange={e => updateSection(i, 'subtitle', e.target.value)}
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <Button size="sm" variant="secondary" onClick={() => saveSection(i)} loading={savingSections}>Save</Button>
                     </div>
                   </div>
                 ))}
