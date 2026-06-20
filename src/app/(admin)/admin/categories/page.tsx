@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
-import { Plus, Edit, Trash2, ChevronRight, ChevronDown, FolderTree, GripVertical } from 'lucide-react'
+import { Plus, Edit, Trash2, ChevronRight, ChevronDown, FolderTree, Upload, ImageIcon } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 import { adminFetch } from '@/lib/admin-fetch'
 import { cn, slugify, getImageUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -50,8 +52,12 @@ function TreeNode({ cat, depth = 0, onEdit, onDelete }: {
             expanded ? <ChevronDown className="w-4 h-4 text-[#6B6B6B]" /> : <ChevronRight className="w-4 h-4 text-[#6B6B6B]" />
           ) : <div className="w-4" />}
         </button>
-        <div className="w-6 h-6 rounded bg-[#F5F5F0] flex items-center justify-center flex-shrink-0">
-          <FolderTree className="w-3.5 h-3.5 text-[#6B6B6B]" />
+        <div className="w-8 h-8 rounded-lg bg-[#F5F5F0] flex items-center justify-center flex-shrink-0 overflow-hidden">
+          {cat.image_url ? (
+            <Image src={getImageUrl(cat.image_url)} alt="" width={32} height={32} className="w-full h-full object-cover" />
+          ) : (
+            <FolderTree className="w-4 h-4 text-[#6B6B6B]" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-[#1A1A1A] truncate">{cat.name}</p>
@@ -89,8 +95,12 @@ export default function AdminCategories() {
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const [form, setForm] = useState({ name: '', slug: '', description: '', parent_id: '', sort_order: '0' })
+  const [form, setForm] = useState({ name: '', slug: '', description: '', parent_id: '', sort_order: '0', image_url: '' })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadCategories() }, [])
 
@@ -106,8 +116,10 @@ export default function AdminCategories() {
 
   const openAdd = () => {
     setEditing(null)
-    setForm({ name: '', slug: '', description: '', parent_id: '', sort_order: '0' })
+    setForm({ name: '', slug: '', description: '', parent_id: '', sort_order: '0', image_url: '' })
     setFormErrors({})
+    setSelectedFile(null)
+    setImagePreview(null)
     setModalOpen(true)
   }
 
@@ -119,8 +131,11 @@ export default function AdminCategories() {
       description: cat.description || '',
       parent_id: cat.parent_id || '',
       sort_order: cat.sort_order.toString(),
+      image_url: cat.image_url || '',
     })
     setFormErrors({})
+    setSelectedFile(null)
+    setImagePreview(null)
     setModalOpen(true)
   }
 
@@ -136,12 +151,23 @@ export default function AdminCategories() {
     if (!validate()) return
     setSaving(true)
     try {
+      let image_url = form.image_url
+      if (selectedFile) {
+        setUploadingImage(true)
+        const ext = selectedFile.name.split('.').pop()
+        const fileName = `categories/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
+        const { error: uploadError } = await supabase.storage.from('product-images').upload(fileName, selectedFile)
+        if (uploadError) throw uploadError
+        image_url = `product-images/${fileName}`
+        setUploadingImage(false)
+      }
       const payload = {
         name: form.name.trim(),
         slug: form.slug.trim(),
         description: form.description.trim() || null,
         parent_id: form.parent_id || null,
         sort_order: parseInt(form.sort_order) || 0,
+        image_url: image_url || null,
       }
       if (editing) {
         await adminFetch('/api/admin/categories', { method: 'PUT', body: { id: editing.id, ...payload } })
@@ -154,7 +180,7 @@ export default function AdminCategories() {
       loadCategories()
     } catch (err: any) {
       toast(err.message || 'Save failed', 'error')
-    } finally { setSaving(false) }
+    } finally { setSaving(false); setUploadingImage(false) }
   }
 
   const handleDelete = async () => {
@@ -235,6 +261,41 @@ export default function AdminCategories() {
             </select>
           </div>
           <Input label="Sort Order" type="number" value={form.sort_order} onChange={e => setForm(prev => ({ ...prev, sort_order: e.target.value }))} />
+          <div>
+            <label className="block text-sm font-medium text-[#1A1A1A] mb-2">Category Image</label>
+            <div className="flex items-start gap-4">
+              <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-[#F5F5F0] border border-[rgba(0,0,0,0.06)] flex-shrink-0">
+                {(imagePreview || form.image_url) ? (
+                  <Image src={imagePreview || getImageUrl(form.image_url)} alt="" fill className="object-cover" sizes="96px" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-[#6B6B6B]" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setSelectedFile(file)
+                      setImagePreview(URL.createObjectURL(file))
+                    }
+                  }}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="w-3.5 h-3.5 mr-2" /> Choose Image
+                </Button>
+                {form.image_url && !selectedFile && (
+                  <p className="text-xs text-[#6B6B6B] mt-1">Existing image will be kept</p>
+                )}
+              </div>
+            </div>
+          </div>
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
             <Button loading={saving} onClick={handleSave}>{editing ? 'Update' : 'Create'}</Button>

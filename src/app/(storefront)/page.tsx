@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRight, ChevronLeft, ChevronRight, Mail, Check, Star, ShoppingBag, Truck, Shield, RotateCcw, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { cn, formatCurrency, truncate } from '@/lib/utils'
+import { cn, formatCurrency, getImageUrl, truncate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ProductCard } from '@/components/storefront/ProductCard'
@@ -269,7 +269,7 @@ export default function HomePage() {
                 <Link href={`/products?category=${cat.slug}`} className="group block">
                   <div className="relative w-40 h-52 md:w-48 md:h-64 rounded-2xl overflow-hidden bg-[#F5F5F0]">
                     <Image
-                      src={cat.image_url || '/placeholder.svg'}
+                      src={getImageUrl(cat.image_url) || '/placeholder.svg'}
                       alt={cat.name}
                       fill
                       className="object-cover transition-transform duration-500 group-hover:scale-110"
