@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Package, Truck, CheckCircle, XCircle, Clock, Printer, MapPin } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { supabase } from '@/lib/supabase'
+import { adminApi } from '@/lib/admin-fetch'
 import { cn, formatCurrency, getImageUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -51,22 +51,18 @@ export default function AdminOrderDetail() {
   async function loadOrder() {
     setLoading(true)
     try {
-      const { data: orderData } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', params.id)
-        .single()
+      const orderData = await adminApi.select('orders', [{ method: 'eq', column: 'id', value: params.id }], { single: true })
       if (!orderData) throw new Error('Order not found')
-      setOrder(orderData as Order)
+      setOrder(orderData)
       setTracking(orderData.tracking_number || '')
       setNotes(orderData.notes || '')
 
-      const [itemsRes, timelineRes] = await Promise.all([
-        supabase.from('order_items').select('*').eq('order_id', params.id),
-        supabase.from('order_timeline').select('*').eq('order_id', params.id).order('created_at', { ascending: false }),
+      const [items, timeline] = await Promise.all([
+        adminApi.select('order_items', [{ method: 'eq', column: 'order_id', value: params.id }]),
+        adminApi.select('order_timeline', [{ method: 'eq', column: 'order_id', value: params.id }], { order: { column: 'created_at', ascending: false } }),
       ])
-      setItems((itemsRes.data || []) as OrderItem[])
-      setTimeline((timelineRes.data || []) as OrderTimeline[])
+      setItems((items || []) as OrderItem[])
+      setTimeline((timeline || []) as OrderTimeline[])
     } catch (err: any) {
       toast(err.message || 'Failed to load order', 'error')
     } finally {
@@ -78,8 +74,8 @@ export default function AdminOrderDetail() {
     if (!order) return
     setUpdating(true)
     try {
-      await supabase.from('orders').update({ fulfillment_status: newStatus }).eq('id', order.id)
-      await supabase.from('order_timeline').insert({
+      await adminApi.update('orders', { fulfillment_status: newStatus }, [{ method: 'eq', column: 'id', value: order.id }])
+      await adminApi.insert('order_timeline', {
         order_id: order.id,
         status: newStatus,
         note: null,
@@ -97,7 +93,7 @@ export default function AdminOrderDetail() {
     if (!order) return
     setUpdating(true)
     try {
-      await supabase.from('orders').update({ tracking_number: tracking }).eq('id', order.id)
+      await adminApi.update('orders', { tracking_number: tracking }, [{ method: 'eq', column: 'id', value: order.id }])
       toast('Tracking updated', 'success')
     } catch (err: any) {
       toast(err.message || 'Update failed', 'error')
@@ -110,7 +106,7 @@ export default function AdminOrderDetail() {
     if (!order) return
     setUpdating(true)
     try {
-      await supabase.from('orders').update({ notes }).eq('id', order.id)
+      await adminApi.update('orders', { notes }, [{ method: 'eq', column: 'id', value: order.id }])
       toast('Notes saved', 'success')
     } catch (err: any) {
       toast(err.message || 'Save failed', 'error')

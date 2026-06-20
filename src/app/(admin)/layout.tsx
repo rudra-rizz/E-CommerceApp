@@ -8,9 +8,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Package, FolderTree, ShoppingCart, Users, Tag,
   Settings, Search, Image as ImageIcon, BarChart3, LogOut, Menu, X,
-  ChevronDown, Store
+  ChevronDown, Store, Eye, EyeOff, Loader2
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { createClient } from '@supabase/supabase-js'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -27,7 +28,7 @@ const navItems = [
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { profile, loading, signOut } = useAuth()
+  const { user, profile, loading, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -35,13 +36,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => { setMounted(true) }, [])
 
-  useEffect(() => {
-    if (mounted && !loading && (!profile || profile.role !== 'admin')) {
-      router.replace('/')
-    }
-  }, [mounted, loading, profile, router])
+  if (!mounted || loading) return null
 
-  if (!mounted || loading || !profile || profile.role !== 'admin') return null
+  if (!user) {
+    return <AdminLogin />
+  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -118,11 +117,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-[#2563EB]/10 flex items-center justify-center text-[#2563EB] font-semibold text-sm">
-                {profile.full_name?.charAt(0)?.toUpperCase() || profile.email.charAt(0).toUpperCase()}
+                {profile?.full_name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || 'A'}
               </div>
               <div className="hidden sm:block">
-                <p className="text-sm font-medium text-[#1A1A1A]">{profile.full_name || 'Admin'}</p>
-                <p className="text-xs text-[#6B6B6B]">{profile.email}</p>
+                <p className="text-sm font-medium text-[#1A1A1A]">{profile?.full_name || 'Admin'}</p>
+                <p className="text-xs text-[#6B6B6B]">{profile?.email || user?.email || ''}</p>
               </div>
             </div>
             <button
@@ -138,6 +137,121 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
           {children}
         </main>
+      </div>
+    </div>
+  )
+}
+
+function AdminLogin() {
+  const { user, profile } = useAuth()
+  const [email, setEmail] = useState('admin@store.com')
+  const [password, setPassword] = useState('admin')
+  const [showPw, setShowPw] = useState(false)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (user && profile?.role === 'admin') {
+      window.location.href = '/admin'
+    }
+  }, [user, profile])
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setBusy(true)
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Login failed')
+      } else {
+        const sb = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+        )
+        await sb.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        })
+        window.location.href = '/admin'
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Network error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#FAFAFA] p-8">
+      <div className="bg-white rounded-2xl shadow-lg border border-[rgba(0,0,0,0.06)] p-8 max-w-sm w-full">
+        <div className="text-center mb-8">
+          <Store className="w-10 h-10 mx-auto mb-3 text-[#2563EB]" />
+          <h1 className="font-serif text-2xl">Admin</h1>
+          <p className="text-[#6B6B6B] text-sm mt-1">Sign in to manage your store</p>
+        </div>
+
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full h-11 px-3 text-sm bg-white border border-[rgba(0,0,0,0.12)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent transition-all"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#1A1A1A] mb-1.5">Password</label>
+            <div className="relative">
+              <input
+                type={showPw ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full h-11 px-3 pr-10 text-sm bg-white border border-[rgba(0,0,0,0.12)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2563EB] focus:border-transparent transition-all"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw(!showPw)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] hover:text-[#1A1A1A]"
+              >
+                {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-sm text-[#DC2626] bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full h-11 bg-[#2563EB] text-white rounded-xl text-sm font-medium hover:bg-[#1d4ed8] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+            {busy ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
+
+        <div className="mt-6 pt-6 border-t border-[rgba(0,0,0,0.06)] text-center">
+          <p className="text-xs text-[#6B6B6B] mb-2">First time?</p>
+          <a href="/api/setup" className="text-xs text-[#2563EB] hover:underline">
+            Create default admin account
+          </a>
+          <p className="text-xs text-[#6B6B6B] mt-2">Default: admin@store.com / admin</p>
+          <a href="/api/fix-admin" className="text-xs text-[#2563EB] hover:underline mt-2 inline-block">
+            Fix admin role
+          </a>
+        </div>
       </div>
     </div>
   )

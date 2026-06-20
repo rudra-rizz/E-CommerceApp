@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Edit, Trash2, Tag } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { supabase } from '@/lib/supabase'
+import { adminApi } from '@/lib/admin-fetch'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,13 +52,13 @@ export default function AdminCoupons() {
     setLoading(true)
     try {
       const [couponsRes, catsRes, productsRes] = await Promise.all([
-        supabase.from('coupons').select('*').order('created_at', { ascending: false }),
-        supabase.from('categories').select('id, name'),
-        supabase.from('products').select('id, title').eq('status', 'active'),
+        adminApi.select('coupons', [], { order: { column: 'created_at', ascending: false } }),
+        adminApi.select('categories', [], { select: 'id, name', order: { column: 'name', ascending: true } }),
+        adminApi.select('products', [{ method: 'eq', column: 'status', value: 'active' }], { select: 'id, title' }),
       ])
-      setCoupons((couponsRes.data || []) as Coupon[])
-      setCategories((catsRes.data || []) as Category[])
-      setProducts((productsRes.data || []) as Array<{ id: string; title: string }>)
+      setCoupons((couponsRes || []) as Coupon[])
+      setCategories((catsRes || []) as Category[])
+      setProducts((productsRes || []) as Array<{ id: string; title: string }>)
     } finally { setLoading(false) }
   }
 
@@ -114,10 +114,10 @@ export default function AdminCoupons() {
         is_active: form.is_active,
       }
       if (editing) {
-        await supabase.from('coupons').update(data).eq('id', editing.id)
+        await adminApi.update('coupons', data, [{ method: 'eq', column: 'id', value: editing.id }])
         toast('Coupon updated', 'success')
       } else {
-        await supabase.from('coupons').insert(data)
+        await adminApi.insert('coupons', data)
         toast('Coupon created', 'success')
       }
       setModalOpen(false)
@@ -131,7 +131,7 @@ export default function AdminCoupons() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await supabase.from('coupons').delete().eq('id', deleteTarget.id)
+      await adminApi.delete('coupons', [{ method: 'eq', column: 'id', value: deleteTarget.id }])
       toast('Coupon deleted', 'success')
       setDeleteTarget(null)
       loadData()

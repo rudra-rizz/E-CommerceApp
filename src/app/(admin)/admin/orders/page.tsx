@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Search, Filter, ShoppingCart, ChevronDown } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { supabase } from '@/lib/supabase'
+import { adminApi } from '@/lib/admin-fetch'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,10 +46,7 @@ export default function AdminOrders() {
   async function loadOrders() {
     setLoading(true)
     try {
-      const { data } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const data = await adminApi.select('orders', [], { order: { column: 'created_at', ascending: false } })
       setOrders((data || []) as Order[])
     } catch (err) {
       console.error(err)

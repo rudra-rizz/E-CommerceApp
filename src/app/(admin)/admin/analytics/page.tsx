@@ -6,7 +6,7 @@ import {
   LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts'
 import { format, subDays, parseISO } from 'date-fns'
-import { supabase } from '@/lib/supabase'
+import { adminApi } from '@/lib/admin-fetch'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TrendingUp, ShoppingCart, DollarSign, Users } from 'lucide-react'
@@ -31,10 +31,7 @@ export default function AdminAnalytics() {
       const days = range === '30d' ? 30 : range === '90d' ? 90 : 365
       const since = subDays(new Date(), days).toISOString()
 
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('*, items:order_items(*)')
-        .gte('created_at', since)
+      const orders = await adminApi.select('orders', [{ method: 'gte', column: 'created_at', value: since }], { select: '*, items:order_items(*)' })
 
       const allOrders = (orders || []).filter((o: any) => o.payment_status === 'paid')
 
@@ -69,22 +66,17 @@ export default function AdminAnalytics() {
       setTopProductsUnits([...sorted].sort((a, b) => b.units - a.units).slice(0, 10))
 
       const catSales: Record<string, number> = {}
-      const { data: products } = await supabase.from('products').select('id, category:categories(name)')
-      const prodCatMap = new Map((products || []).map((p: any) => [p.id, p.category?.name || 'Uncategorized']))
+      const products = await adminApi.select('products', [], { select: 'id, category:categories(name)' })
+      const prodCatMap = new Map<string, string>((products || []).map((p: any) => [p.id, p.category?.name || 'Uncategorized']))
       for (const order of allOrders) {
         const items = (order as any).items || []
         for (const item of items) {
-          const cat = prodCatMap.get(item.product_id) || 'Uncategorized'
-          catSales[cat] = (catSales[cat] || 0) + item.line_total
+          catSales[prodCatMap.get(item.product_id) || 'Uncategorized'] += item.line_total || 0
         }
       }
       setTopCategories(Object.entries(catSales).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value))
 
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('created_at')
-        .eq('role', 'customer')
-        .gte('created_at', since)
+      const profiles = await adminApi.select('profiles', [{ method: 'eq', column: 'role', value: 'customer' }, { method: 'gte', column: 'created_at', value: since }], { select: 'created_at' })
       const dailyCustomers: Record<string, number> = {}
       for (let i = days - 1; i >= 0; i--) {
         dailyCustomers[format(subDays(new Date(), i), 'yyyy-MM-dd')] = 0

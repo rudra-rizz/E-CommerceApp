@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { supabase } from '@/lib/supabase'
+import { adminApi } from '@/lib/admin-fetch'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,7 +73,7 @@ export default function AdminSeo() {
   async function loadSeo() {
     setLoading(true)
     try {
-      const { data } = await supabase.from('seo_settings').select('*').single()
+      const data = await adminApi.select('seo_settings', [], { single: true })
       if (data) setSeo(data as SeoSettings)
     } finally { setLoading(false) }
   }
@@ -82,9 +82,9 @@ export default function AdminSeo() {
     setSaving(true)
     try {
       if (seo.id) {
-        await supabase.from('seo_settings').update(seo).eq('id', seo.id)
+        await adminApi.update('seo_settings', seo, [{ method: 'eq', column: 'id', value: seo.id }])
       } else {
-        await supabase.from('seo_settings').insert(seo)
+        await adminApi.insert('seo_settings', seo)
       }
       toast('SEO settings saved', 'success')
     } catch (err: any) {

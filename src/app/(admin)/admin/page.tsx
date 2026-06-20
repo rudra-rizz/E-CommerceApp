@@ -11,7 +11,7 @@ import {
   BarChart, Bar
 } from 'recharts'
 import { format, subDays, startOfDay, parseISO } from 'date-fns'
-import { supabase } from '@/lib/supabase'
+import { adminApi } from '@/lib/admin-fetch'
 import { formatCurrency, cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { Order, Product } from '@/types'
@@ -92,20 +92,20 @@ export default function AdminDashboard() {
       const days = revenueRange === '7d' ? 7 : revenueRange === '30d' ? 30 : revenueRange === '90d' ? 90 : 365
       const since = subDays(new Date(), days).toISOString()
 
-      const [ordersRes, productsRes, customersRes] = await Promise.all([
-        supabase.from('orders').select('*').gte('created_at', since),
-        supabase.from('products').select('*').lte('stock_quantity', 10).neq('status', 'draft'),
-        supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'customer'),
+      const [orders, productsRes, customerCount] = await Promise.all([
+        adminApi.select('orders', [{ method: 'gte', column: 'created_at', value: since }]),
+        adminApi.select('products', [{ method: 'lte', column: 'stock_quantity', value: 10 }, { method: 'neq', column: 'status', value: 'draft' }]),
+        adminApi.count('profiles', [{ method: 'eq', column: 'role', value: 'customer' }]),
       ])
 
-      const orders = (ordersRes.data || []) as Order[]
-      const paidOrders = orders.filter(o => o.payment_status === 'paid')
+      const orderList = (orders || []) as Order[]
+      const paidOrders = orderList.filter(o => o.payment_status === 'paid')
       const totalRevenue = paidOrders.reduce((sum, o) => sum + o.total, 0)
       setRevenue(totalRevenue)
-      setOrdersCount(orders.length)
-      setCustomersCount(customersRes.count || 0)
+      setOrdersCount(orderList.length)
+      setCustomersCount(customerCount.count || 0)
       setAvgOrderValue(paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0)
-      setLowStock((productsRes.data || []) as Product[])
+      setLowStock((productsRes || []) as Product[])
 
       const dailyRevenue: Record<string, number> = {}
       for (let i = days - 1; i >= 0; i--) {
@@ -118,13 +118,13 @@ export default function AdminDashboard() {
       })
       setRevenueData(Object.entries(dailyRevenue).map(([date, rev]) => ({ date, revenue: rev })))
 
-      setRecentOrders(orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10))
+      setRecentOrders(orderList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10))
 
       const productSales: Record<string, { title: string; revenue: number; units: number }> = {}
       for (const order of paidOrders) {
-        const { data: items } = await supabase.from('order_items').select('*').eq('order_id', order.id)
+        const items = await adminApi.select('order_items', [{ method: 'eq', column: 'order_id', value: order.id }])
         if (items) {
-          for (const item of items) {
+          for (const item of items as any[]) {
             if (!productSales[item.product_id]) {
               productSales[item.product_id] = { title: item.title, revenue: 0, units: 0 }
             }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { format, parseISO } from 'date-fns'
 import { ArrowLeft, Mail, Phone, MapPin, ShoppingBag } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { adminApi } from '@/lib/admin-fetch'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -29,16 +29,16 @@ export default function AdminCustomerDetail() {
   async function loadCustomer() {
     setLoading(true)
     try {
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', params.id).single()
+      const profile = await adminApi.select('profiles', [{ method: 'eq', column: 'id', value: params.id }], { single: true })
       if (!profile) throw new Error('Customer not found')
       setCustomer(profile as Profile)
 
       const [ordersRes, addressesRes] = await Promise.all([
-        supabase.from('orders').select('*').eq('user_id', params.id).order('created_at', { ascending: false }),
-        supabase.from('addresses').select('*').eq('user_id', params.id),
+        adminApi.select('orders', [{ method: 'eq', column: 'user_id', value: params.id }], { order: { column: 'created_at', ascending: false } }),
+        adminApi.select('addresses', [{ method: 'eq', column: 'user_id', value: params.id }]),
       ])
-      setOrders((ordersRes.data || []) as Order[])
-      setAddresses((addressesRes.data || []) as Address[])
+      setOrders((ordersRes || []) as Order[])
+      setAddresses((addressesRes || []) as Address[])
     } catch (err: any) {
       toast(err.message || 'Failed to load customer', 'error')
     } finally {
@@ -49,7 +49,7 @@ export default function AdminCustomerDetail() {
   async function saveNotes() {
     setSavingNotes(true)
     try {
-      await supabase.from('profiles').update({ full_name: customer?.full_name }).eq('id', params.id)
+      await adminApi.update('profiles', { full_name: customer?.full_name }, [{ method: 'eq', column: 'id', value: params.id }])
       toast('Notes updated', 'success')
     } catch (err: any) {
       toast(err.message || 'Save failed', 'error')

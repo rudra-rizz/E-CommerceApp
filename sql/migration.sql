@@ -2,14 +2,33 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create custom types
-CREATE TYPE user_role AS ENUM ('customer', 'admin');
-CREATE TYPE product_status AS ENUM ('draft', 'active');
-CREATE TYPE payment_status AS ENUM ('pending', 'paid', 'failed', 'refunded');
-CREATE TYPE fulfillment_status AS ENUM ('pending', 'processing', 'shipped', 'delivered', 'cancelled');
-CREATE TYPE coupon_type AS ENUM ('percentage', 'fixed');
+DO $$ BEGIN
+  CREATE TYPE user_role AS ENUM ('customer', 'admin');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE product_status AS ENUM ('draft', 'active');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE payment_status AS ENUM ('pending', 'paid', 'failed', 'refunded');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE fulfillment_status AS ENUM ('pending', 'processing', 'shipped', 'delivered', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE coupon_type AS ENUM ('percentage', 'fixed');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 1. profiles
-CREATE TABLE profiles (
+CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   full_name TEXT,
@@ -21,7 +40,7 @@ CREATE TABLE profiles (
 );
 
 -- 2. site_settings
-CREATE TABLE site_settings (
+CREATE TABLE IF NOT EXISTS site_settings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   site_name TEXT DEFAULT 'STORE',
   tagline TEXT,
@@ -48,7 +67,7 @@ CREATE TABLE site_settings (
 );
 
 -- 3. seo_settings
-CREATE TABLE seo_settings (
+CREATE TABLE IF NOT EXISTS seo_settings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   meta_title_template TEXT DEFAULT '{Page Title} | {Site Name}',
   default_meta_description TEXT,
@@ -61,7 +80,7 @@ CREATE TABLE seo_settings (
 );
 
 -- 4. page_seo
-CREATE TABLE page_seo (
+CREATE TABLE IF NOT EXISTS page_seo (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   page_slug TEXT UNIQUE NOT NULL,
   meta_title TEXT,
@@ -70,7 +89,7 @@ CREATE TABLE page_seo (
 );
 
 -- 5. categories
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
@@ -82,7 +101,7 @@ CREATE TABLE categories (
 );
 
 -- 6. products
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   title TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
@@ -106,7 +125,7 @@ CREATE TABLE products (
 );
 
 -- 7. product_images
-CREATE TABLE product_images (
+CREATE TABLE IF NOT EXISTS product_images (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   product_id UUID REFERENCES products(id) ON DELETE CASCADE,
   image_url TEXT NOT NULL,
@@ -115,7 +134,7 @@ CREATE TABLE product_images (
 );
 
 -- 8. product_options
-CREATE TABLE product_options (
+CREATE TABLE IF NOT EXISTS product_options (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   product_id UUID REFERENCES products(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -123,7 +142,7 @@ CREATE TABLE product_options (
 );
 
 -- 9. product_option_values
-CREATE TABLE product_option_values (
+CREATE TABLE IF NOT EXISTS product_option_values (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   option_id UUID REFERENCES product_options(id) ON DELETE CASCADE,
   value TEXT NOT NULL,
@@ -131,7 +150,7 @@ CREATE TABLE product_option_values (
 );
 
 -- 10. product_variants
-CREATE TABLE product_variants (
+CREATE TABLE IF NOT EXISTS product_variants (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   product_id UUID REFERENCES products(id) ON DELETE CASCADE,
   sku TEXT NOT NULL,
@@ -142,7 +161,7 @@ CREATE TABLE product_variants (
 );
 
 -- 11. addresses
-CREATE TABLE addresses (
+CREATE TABLE IF NOT EXISTS addresses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   full_name TEXT NOT NULL,
@@ -158,7 +177,7 @@ CREATE TABLE addresses (
 );
 
 -- 12. orders
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   order_number TEXT UNIQUE NOT NULL,
   user_id UUID REFERENCES profiles(id),
@@ -183,7 +202,7 @@ CREATE TABLE orders (
 );
 
 -- 13. order_items
-CREATE TABLE order_items (
+CREATE TABLE IF NOT EXISTS order_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
   product_id UUID REFERENCES products(id),
@@ -196,7 +215,7 @@ CREATE TABLE order_items (
 );
 
 -- 14. order_timeline
-CREATE TABLE order_timeline (
+CREATE TABLE IF NOT EXISTS order_timeline (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
   status TEXT NOT NULL,
@@ -206,7 +225,7 @@ CREATE TABLE order_timeline (
 );
 
 -- 15. reviews
-CREATE TABLE reviews (
+CREATE TABLE IF NOT EXISTS reviews (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   product_id UUID REFERENCES products(id) ON DELETE CASCADE,
   user_id UUID REFERENCES profiles(id),
@@ -219,7 +238,7 @@ CREATE TABLE reviews (
 );
 
 -- 16. coupons
-CREATE TABLE coupons (
+CREATE TABLE IF NOT EXISTS coupons (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   code TEXT UNIQUE NOT NULL,
   type coupon_type NOT NULL,
@@ -237,14 +256,14 @@ CREATE TABLE coupons (
 );
 
 -- 17. subscribers
-CREATE TABLE subscribers (
+CREATE TABLE IF NOT EXISTS subscribers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email TEXT UNIQUE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- 18. hero_slides
-CREATE TABLE hero_slides (
+CREATE TABLE IF NOT EXISTS hero_slides (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   image_url TEXT NOT NULL,
   heading TEXT NOT NULL,
@@ -256,7 +275,7 @@ CREATE TABLE hero_slides (
 );
 
 -- 19. wishlist
-CREATE TABLE wishlist (
+CREATE TABLE IF NOT EXISTS wishlist (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   product_id UUID REFERENCES products(id) ON DELETE CASCADE,
@@ -265,7 +284,7 @@ CREATE TABLE wishlist (
 );
 
 -- 20. media
-CREATE TABLE media (
+CREATE TABLE IF NOT EXISTS media (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   url TEXT NOT NULL,
   filename TEXT,
@@ -276,18 +295,18 @@ CREATE TABLE media (
 );
 
 -- INDEXES
-CREATE INDEX idx_products_status ON products(status);
-CREATE INDEX idx_products_category ON products(category_id);
-CREATE INDEX idx_products_slug ON products(slug);
-CREATE INDEX idx_products_created ON products(created_at DESC);
-CREATE INDEX idx_orders_user ON orders(user_id);
-CREATE INDEX idx_orders_number ON orders(order_number);
-CREATE INDEX idx_orders_created ON orders(created_at DESC);
-CREATE INDEX idx_order_items_order ON order_items(order_id);
-CREATE INDEX idx_reviews_product ON reviews(product_id);
-CREATE INDEX idx_wishlist_user ON wishlist(user_id);
-CREATE INDEX idx_categories_parent ON categories(parent_id);
-CREATE INDEX idx_categories_slug ON categories(slug);
+CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug);
+CREATE INDEX IF NOT EXISTS idx_products_created ON products(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_number ON orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_product ON reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_wishlist_user ON wishlist(user_id);
+CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id);
+CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug);
 
 -- TRIGGER: auto-update updated_at
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -298,10 +317,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+DROP TRIGGER IF EXISTS update_products_updated_at ON products;
 CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
 CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+DROP TRIGGER IF EXISTS update_site_settings_updated_at ON site_settings;
 CREATE TRIGGER update_site_settings_updated_at BEFORE UPDATE ON site_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+DROP TRIGGER IF EXISTS update_seo_settings_updated_at ON seo_settings;
 CREATE TRIGGER update_seo_settings_updated_at BEFORE UPDATE ON seo_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- TRIGGER: auto-generate order_number
@@ -326,6 +350,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS decrement_stock ON order_items;
 CREATE TRIGGER decrement_stock AFTER INSERT ON order_items FOR EACH ROW EXECUTE FUNCTION decrement_stock_on_order();
 
 -- TRIGGER: increment coupon usage
@@ -339,6 +364,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS increment_coupon ON orders;
 CREATE TRIGGER increment_coupon AFTER INSERT ON orders FOR EACH ROW EXECUTE FUNCTION increment_coupon_usage();
 
 -- TRIGGER: create order timeline entry
@@ -351,6 +377,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS order_timeline_trigger ON orders;
 CREATE TRIGGER order_timeline_trigger AFTER INSERT ON orders FOR EACH ROW EXECUTE FUNCTION create_order_timeline();
 
 -- RLS POLICIES
@@ -373,44 +400,117 @@ ALTER TABLE product_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE product_option_values ENABLE ROW LEVEL SECURITY;
 ALTER TABLE product_variants ENABLE ROW LEVEL SECURITY;
 
+-- Security definer helper to check admin role (avoids infinite RLS recursion)
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin');
+$$;
+
 -- Public read policies
+DROP POLICY IF EXISTS "Public products read" ON products;
+DROP POLICY IF EXISTS "Public products read" ON products;
 CREATE POLICY "Public products read" ON products FOR SELECT USING (status = 'active');
+DROP POLICY IF EXISTS "Public categories read" ON categories;
+DROP POLICY IF EXISTS "Public categories read" ON categories;
 CREATE POLICY "Public categories read" ON categories FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public reviews read" ON reviews;
+DROP POLICY IF EXISTS "Public reviews read" ON reviews;
 CREATE POLICY "Public reviews read" ON reviews FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public hero_slides read" ON hero_slides;
+DROP POLICY IF EXISTS "Public hero_slides read" ON hero_slides;
 CREATE POLICY "Public hero_slides read" ON hero_slides FOR SELECT USING (is_active = true);
+DROP POLICY IF EXISTS "Public site_settings read" ON site_settings;
+DROP POLICY IF EXISTS "Public site_settings read" ON site_settings;
 CREATE POLICY "Public site_settings read" ON site_settings FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public product_images read" ON product_images;
+DROP POLICY IF EXISTS "Public product_images read" ON product_images;
 CREATE POLICY "Public product_images read" ON product_images FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public product_options read" ON product_options;
+DROP POLICY IF EXISTS "Public product_options read" ON product_options;
 CREATE POLICY "Public product_options read" ON product_options FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public product_option_values read" ON product_option_values;
+DROP POLICY IF EXISTS "Public product_option_values read" ON product_option_values;
 CREATE POLICY "Public product_option_values read" ON product_option_values FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public product_variants read" ON product_variants;
+DROP POLICY IF EXISTS "Public product_variants read" ON product_variants;
 CREATE POLICY "Public product_variants read" ON product_variants FOR SELECT USING (true);
 
 -- Customer policies
+DROP POLICY IF EXISTS "Users own profile" ON profiles;
+DROP POLICY IF EXISTS "Users own profile" ON profiles;
 CREATE POLICY "Users own profile" ON profiles FOR ALL USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Users own orders" ON orders;
+DROP POLICY IF EXISTS "Users own orders" ON orders;
 CREATE POLICY "Users own orders" ON orders FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users own order_items" ON order_items;
+DROP POLICY IF EXISTS "Users own order_items" ON order_items;
 CREATE POLICY "Users own order_items" ON order_items FOR SELECT USING (order_id IN (SELECT id FROM orders WHERE user_id = auth.uid()));
+DROP POLICY IF EXISTS "Users own reviews" ON reviews;
+DROP POLICY IF EXISTS "Users own reviews" ON reviews;
 CREATE POLICY "Users own reviews" ON reviews FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users own wishlist" ON wishlist;
+DROP POLICY IF EXISTS "Users own wishlist" ON wishlist;
 CREATE POLICY "Users own wishlist" ON wishlist FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users own addresses" ON addresses;
+DROP POLICY IF EXISTS "Users own addresses" ON addresses;
 CREATE POLICY "Users own addresses" ON addresses FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users create reviews" ON reviews;
+DROP POLICY IF EXISTS "Users create reviews" ON reviews;
 CREATE POLICY "Users create reviews" ON reviews FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users create orders" ON orders;
+DROP POLICY IF EXISTS "Users create orders" ON orders;
 CREATE POLICY "Users create orders" ON orders FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Admin policies
-CREATE POLICY "Admin all products" ON products FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all categories" ON categories FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all orders" ON orders FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all coupons" ON coupons FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all settings" ON site_settings FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all seo" ON seo_settings FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all hero" ON hero_slides FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all subscribers" ON subscribers FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all media" ON media FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all images" ON product_images FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all options" ON product_options FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all opt_values" ON product_option_values FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all variants" ON product_variants FOR ALL USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all reviews" ON reviews FOR DELETE USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
-CREATE POLICY "Admin all profiles" ON profiles FOR SELECT USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
+DROP POLICY IF EXISTS "Admin all products" ON products;
+DROP POLICY IF EXISTS "Admin all products" ON products;
+CREATE POLICY "Admin all products" ON products FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all categories" ON categories;
+DROP POLICY IF EXISTS "Admin all categories" ON categories;
+CREATE POLICY "Admin all categories" ON categories FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all orders" ON orders;
+DROP POLICY IF EXISTS "Admin all orders" ON orders;
+CREATE POLICY "Admin all orders" ON orders FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all coupons" ON coupons;
+DROP POLICY IF EXISTS "Admin all coupons" ON coupons;
+CREATE POLICY "Admin all coupons" ON coupons FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all settings" ON site_settings;
+DROP POLICY IF EXISTS "Admin all settings" ON site_settings;
+CREATE POLICY "Admin all settings" ON site_settings FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all seo" ON seo_settings;
+DROP POLICY IF EXISTS "Admin all seo" ON seo_settings;
+CREATE POLICY "Admin all seo" ON seo_settings FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all hero" ON hero_slides;
+DROP POLICY IF EXISTS "Admin all hero" ON hero_slides;
+CREATE POLICY "Admin all hero" ON hero_slides FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all subscribers" ON subscribers;
+DROP POLICY IF EXISTS "Admin all subscribers" ON subscribers;
+CREATE POLICY "Admin all subscribers" ON subscribers FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all media" ON media;
+DROP POLICY IF EXISTS "Admin all media" ON media;
+CREATE POLICY "Admin all media" ON media FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all images" ON product_images;
+DROP POLICY IF EXISTS "Admin all images" ON product_images;
+CREATE POLICY "Admin all images" ON product_images FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all options" ON product_options;
+DROP POLICY IF EXISTS "Admin all options" ON product_options;
+CREATE POLICY "Admin all options" ON product_options FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all opt_values" ON product_option_values;
+DROP POLICY IF EXISTS "Admin all opt_values" ON product_option_values;
+CREATE POLICY "Admin all opt_values" ON product_option_values FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all variants" ON product_variants;
+DROP POLICY IF EXISTS "Admin all variants" ON product_variants;
+CREATE POLICY "Admin all variants" ON product_variants FOR ALL USING (is_admin());
+DROP POLICY IF EXISTS "Admin all reviews" ON reviews;
+DROP POLICY IF EXISTS "Admin all reviews" ON reviews;
+CREATE POLICY "Admin all reviews" ON reviews FOR DELETE USING (is_admin());
+DROP POLICY IF EXISTS "Admin all profiles" ON profiles;
+DROP POLICY IF EXISTS "Admin all profiles" ON profiles;
+CREATE POLICY "Admin all profiles" ON profiles FOR SELECT USING (is_admin());
 
 -- Insert default site settings
-INSERT INTO site_settings (site_name, tagline) VALUES ('STORE', 'Premium Products. Curated for You.');
-INSERT INTO seo_settings (meta_title_template, robots_txt) VALUES ('{Page Title} | STORE', 'User-agent: *\nAllow: /');

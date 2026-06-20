@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Search, Users } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
-import { supabase } from '@/lib/supabase'
+import { adminApi } from '@/lib/admin-fetch'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -28,24 +28,16 @@ export default function AdminCustomers() {
   async function loadCustomers() {
     setLoading(true)
     try {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'customer')
-        .order('created_at', { ascending: false })
+      const profiles = await adminApi.select('profiles', [{ method: 'eq', column: 'role', value: 'customer' }], { order: { column: 'created_at', ascending: false } })
       const list = (profiles || []) as Profile[]
 
       const enriched = await Promise.all(
         list.map(async (p) => {
-          const { count } = await supabase
-            .from('orders')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', p.id)
-          const { data: paidOrders } = await supabase
-            .from('orders')
-            .select('total')
-            .eq('user_id', p.id)
-            .eq('payment_status', 'paid')
+          const { count } = await adminApi.count('orders', [{ method: 'eq', column: 'user_id', value: p.id }])
+          const paidOrders = await adminApi.select('orders', [
+            { method: 'eq', column: 'user_id', value: p.id },
+            { method: 'eq', column: 'payment_status', value: 'paid' },
+          ], { select: 'total' })
           const totalSpent = (paidOrders || []).reduce((sum: number, o: any) => sum + o.total, 0)
           return { ...p, order_count: count || 0, total_spent: totalSpent }
         })

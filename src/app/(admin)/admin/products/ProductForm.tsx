@@ -10,6 +10,7 @@ import {
   Save, Eye, X, Plus, Trash2, Upload, Image as ImageIcon, GripVertical
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { adminApi } from '@/lib/admin-fetch'
 import { cn, slugify, getImageUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -75,7 +76,7 @@ export default function AdminProductForm({ productId }: Props) {
     stock_quantity: '0',
     track_inventory: true,
     allow_backorders: false,
-    status: 'draft',
+    status: 'active',
     meta_title: '',
     meta_description: '',
     og_image_url: '',
@@ -88,7 +89,7 @@ export default function AdminProductForm({ productId }: Props) {
   })
 
   useEffect(() => {
-    supabase.from('categories').select('*').order('name').then(({ data }) => {
+    adminApi.select('categories', [], { order: { column: 'name', ascending: true } }).then((data) => {
       setCategories((data || []) as Category[])
     })
     if (productId) loadProduct(productId)
@@ -97,12 +98,7 @@ export default function AdminProductForm({ productId }: Props) {
   async function loadProduct(id: string) {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*, images:product_images(*), options:product_options(*, values:product_option_values(*)), variants:product_variants(*)')
-        .eq('id', id)
-        .single()
-      if (error) throw error
+      const data = await adminApi.select('products', [{ method: 'eq', column: 'id', value: id }], { select: '*, images:product_images(*), options:product_options(*, values:product_option_values(*)), variants:product_variants(*)', single: true })
       const p = data as Product
       setForm({
         title: p.title,
@@ -184,11 +180,11 @@ export default function AdminProductForm({ productId }: Props) {
       for (const file of Array.from(files)) {
         if (productId) {
           const path = await uploadImage(file)
-          const { data } = await supabase.from('product_images').insert({
+          const data = await adminApi.insert('product_images', {
             product_id: productId,
             image_url: path,
             sort_order: existingImages.length + 1,
-          }).select().single()
+          }, { single: true })
           if (data) setExistingImages(prev => [...prev, data as ProductImage])
         } else {
           setUploadedFiles(prev => [...prev, file])
@@ -205,7 +201,7 @@ export default function AdminProductForm({ productId }: Props) {
 
   const removeExistingImage = async (imageId: string) => {
     try {
-      await supabase.from('product_images').delete().eq('id', imageId)
+      await adminApi.delete('product_images', [{ method: 'eq', column: 'id', value: imageId }])
       setExistingImages(prev => prev.filter(i => i.id !== imageId))
       toast('Image removed', 'info')
     } catch { toast('Failed to remove image', 'error') }
@@ -299,18 +295,17 @@ export default function AdminProductForm({ productId }: Props) {
       }
 
       if (productId) {
-        const { error } = await supabase.from('products').update(productData).eq('id', productId)
-        if (error) throw error
+        await adminApi.update('products', productData, [{ method: 'eq', column: 'id', value: productId }])
 
         if (optionGroups.length > 0) {
-          await supabase.from('product_options').delete().eq('product_id', productId)
-          await supabase.from('product_variants').delete().eq('product_id', productId)
+          await adminApi.delete('product_options', [{ method: 'eq', column: 'product_id', value: productId }])
+          await adminApi.delete('product_variants', [{ method: 'eq', column: 'product_id', value: productId }])
           for (const group of optionGroups) {
-            const { data: opt } = await supabase.from('product_options').insert({
+            const opt = await adminApi.insert('product_options', {
               product_id: productId, name: group.name, sort_order: 0
-            }).select().single()
+            }, { single: true })
             if (opt && group.values.length > 0) {
-              await supabase.from('product_option_values').insert(
+              await adminApi.insert('product_option_values',
                 group.values.filter(v => v.trim()).map((v, i) => ({
                   option_id: opt.id, value: v.trim(), sort_order: i
                 }))
@@ -318,7 +313,7 @@ export default function AdminProductForm({ productId }: Props) {
             }
           }
           if (variants.length > 0) {
-            await supabase.from('product_variants').insert(
+            await adminApi.insert('product_variants',
               variants.map(v => ({
                 product_id: productId,
                 sku: v.sku,
@@ -332,31 +327,30 @@ export default function AdminProductForm({ productId }: Props) {
 
         for (const file of uploadedFiles) {
           const path = await uploadImage(file)
-          await supabase.from('product_images').insert({
+          await adminApi.insert('product_images', {
             product_id: productId, image_url: path, sort_order: existingImages.length + 1,
           })
         }
 
         toast('Product updated', 'success')
       } else {
-        const { data, error } = await supabase.from('products').insert(productData).select().single()
-        if (error) throw error
-        const newId = (data as Product).id
+        const result = await adminApi.insert('products', productData, { single: true })
+        const newId = (result as Product).id
 
         for (const file of uploadedFiles) {
           const path = await uploadImage(file)
-          await supabase.from('product_images').insert({
+          await adminApi.insert('product_images', {
             product_id: newId, image_url: path, sort_order: 0,
           })
         }
 
         if (optionGroups.length > 0) {
           for (const group of optionGroups) {
-            const { data: opt } = await supabase.from('product_options').insert({
+            const opt = await adminApi.insert('product_options', {
               product_id: newId, name: group.name, sort_order: 0
-            }).select().single()
+            }, { single: true })
             if (opt && group.values.length > 0) {
-              await supabase.from('product_option_values').insert(
+              await adminApi.insert('product_option_values',
                 group.values.filter(v => v.trim()).map((v, i) => ({
                   option_id: opt.id, value: v.trim(), sort_order: i
                 }))
@@ -364,7 +358,7 @@ export default function AdminProductForm({ productId }: Props) {
             }
           }
           if (variants.length > 0) {
-            await supabase.from('product_variants').insert(
+            await adminApi.insert('product_variants',
               variants.map(v => ({
                 product_id: newId,
                 sku: v.sku,
@@ -406,11 +400,11 @@ export default function AdminProductForm({ productId }: Props) {
           <Button variant="outline" onClick={() => router.back()}>
             <X className="w-4 h-4 mr-2" /> Cancel
           </Button>
-          <Button variant="secondary" loading={saving} onClick={() => handleSubmit('draft')}>
-            <Save className="w-4 h-4 mr-2" /> Save as Draft
-          </Button>
           <Button loading={saving} shimmer onClick={() => handleSubmit('active')}>
             <Eye className="w-4 h-4 mr-2" /> Publish
+          </Button>
+          <Button variant="secondary" loading={saving} onClick={() => handleSubmit('draft')}>
+            <Save className="w-4 h-4 mr-2" /> Save as Draft
           </Button>
         </div>
       </div>

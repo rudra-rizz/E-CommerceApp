@@ -8,7 +8,7 @@ import { motion } from 'framer-motion'
 import {
   Plus, Search, Edit, Trash2, Package, Filter, ChevronDown, MoreHorizontal
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { adminApi } from '@/lib/admin-fetch'
 import { cn, formatCurrency, getImageUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,11 +48,11 @@ export default function AdminProducts() {
     setLoading(true)
     try {
       const [productsRes, catsRes] = await Promise.all([
-        supabase.from('products').select('*, category:categories(*)').order('created_at', { ascending: false }),
-        supabase.from('categories').select('*').order('name'),
+        adminApi.select('products', [], { select: '*, category:categories(*)', order: { column: 'created_at', ascending: false } }),
+        adminApi.select('categories', [], { order: { column: 'name', ascending: true } }),
       ])
-      setProducts((productsRes.data || []) as Product[])
-      setCategories((catsRes.data || []) as Category[])
+      setProducts((productsRes || []) as Product[])
+      setCategories((catsRes || []) as Category[])
     } catch (err) {
       console.error(err)
     } finally {
@@ -98,8 +98,7 @@ export default function AdminProducts() {
     if (!deleteModal) return
     setDeleting(true)
     try {
-      const { error } = await supabase.from('products').delete().eq('id', deleteModal.id)
-      if (error) throw error
+      await adminApi.delete('products', [{ method: 'eq', column: 'id', value: deleteModal.id }])
       toast(`"${deleteModal.title}" deleted`, 'success')
       setProducts(prev => prev.filter(p => p.id !== deleteModal.id))
       setDeleteModal(null)
@@ -113,8 +112,7 @@ export default function AdminProducts() {
   const handleBulkDelete = useCallback(async () => {
     setDeleting(true)
     try {
-      const { error } = await supabase.from('products').delete().in('id', selected)
-      if (error) throw error
+      await adminApi.delete('products', [{ method: 'in', column: 'id', value: selected }])
       toast(`${selected.length} products deleted`, 'success')
       setProducts(prev => prev.filter(p => !selected.includes(p.id)))
       setSelected([])

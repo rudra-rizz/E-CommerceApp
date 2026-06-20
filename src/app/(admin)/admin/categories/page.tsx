@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Plus, Edit, Trash2, ChevronRight, ChevronDown, FolderTree, GripVertical } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { adminFetch } from '@/lib/admin-fetch'
 import { cn, slugify, getImageUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -97,7 +97,7 @@ export default function AdminCategories() {
   async function loadCategories() {
     setLoading(true)
     try {
-      const { data } = await supabase.from('categories').select('*').order('sort_order')
+      const data = await adminFetch('/api/admin/categories')
       const cats = (data || []) as Category[]
       setCategories(cats)
       setTree(buildTree(cats))
@@ -136,7 +136,7 @@ export default function AdminCategories() {
     if (!validate()) return
     setSaving(true)
     try {
-      const data = {
+      const payload = {
         name: form.name.trim(),
         slug: form.slug.trim(),
         description: form.description.trim() || null,
@@ -144,10 +144,10 @@ export default function AdminCategories() {
         sort_order: parseInt(form.sort_order) || 0,
       }
       if (editing) {
-        await supabase.from('categories').update(data).eq('id', editing.id)
+        await adminFetch('/api/admin/categories', { method: 'PUT', body: { id: editing.id, ...payload } })
         toast('Category updated', 'success')
       } else {
-        await supabase.from('categories').insert(data)
+        await adminFetch('/api/admin/categories', { method: 'POST', body: payload })
         toast('Category created', 'success')
       }
       setModalOpen(false)
@@ -161,7 +161,7 @@ export default function AdminCategories() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
-      await supabase.from('categories').delete().eq('id', deleteTarget.id)
+      await adminFetch(`/api/admin/categories?id=${deleteTarget.id}`, { method: 'DELETE' })
       toast(`"${deleteTarget.name}" deleted`, 'success')
       setDeleteTarget(null)
       loadCategories()

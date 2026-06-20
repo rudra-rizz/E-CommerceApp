@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { Plus, Trash2, Upload, Image as ImageIcon, GripVertical } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { adminApi } from '@/lib/admin-fetch'
 import { cn, getImageUrl } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -83,13 +84,13 @@ export default function AdminSettings() {
   async function loadSettings() {
     setLoading(true)
     try {
-      const { data } = await supabase.from('site_settings').select('*').single()
-      if (data) setSettings(data as SiteSettings)
-      const { data: shipping } = await supabase.from('shipping_methods').select('*').order('price')
+      const settingsData = await adminApi.select('site_settings', [], { single: true }).catch(() => null)
+      if (settingsData) setSettings(settingsData as SiteSettings)
+      const shipping = await adminApi.select('shipping_methods', [], { order: { column: 'price', ascending: true } })
       setShippingMethods((shipping || []).map((s: any) => ({
         id: s.id, name: s.name, price: s.price.toString(), delivery_time: s.delivery_time, free_shipping_threshold: s.free_shipping_threshold?.toString() || ''
       })))
-      const { data: slides } = await supabase.from('hero_slides').select('*').order('sort_order')
+      const slides = await adminApi.select('hero_slides', [], { order: { column: 'sort_order', ascending: true } })
       setHeroSlides((slides || []) as HeroSlide[])
     } finally { setLoading(false) }
   }
@@ -102,8 +103,7 @@ export default function AdminSettings() {
       const { error } = await supabase.storage.from('brand-assets').upload(fileName, file)
       if (error) throw error
       const path = `brand-assets/${fileName}`
-      const { error: updateError } = await supabase.from('site_settings').update({ logo_url: path }).eq('id', settings.id)
-      if (updateError) throw updateError
+      await adminApi.update('site_settings', { logo_url: path }, [{ method: 'eq', column: 'id', value: settings.id }])
       setSettings(prev => ({ ...prev, logo_url: path }))
       toast('Logo uploaded', 'success')
     } catch (err: any) {
@@ -114,7 +114,7 @@ export default function AdminSettings() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await supabase.from('site_settings').update({
+      await adminApi.update('site_settings', {
         site_name: settings.site_name,
         tagline: settings.tagline,
         contact_email: settings.contact_email,
@@ -133,7 +133,7 @@ export default function AdminSettings() {
         social_twitter: settings.social_twitter,
         social_tiktok: settings.social_tiktok,
         social_youtube: settings.social_youtube,
-      }).eq('id', settings.id)
+      }, [{ method: 'eq', column: 'id', value: settings.id }])
       toast('Settings saved', 'success')
     } catch (err: any) {
       toast(err.message || 'Save failed', 'error')
@@ -142,11 +142,11 @@ export default function AdminSettings() {
 
   const addShipping = async () => {
     try {
-      await supabase.from('shipping_methods').insert({
+      await adminApi.insert('shipping_methods', {
         name: 'New Method', price: 0, delivery_time: '', free_shipping_threshold: null
       })
       toast('Shipping method added', 'success')
-      const { data } = await supabase.from('shipping_methods').select('*').order('price')
+      const data = await adminApi.select('shipping_methods', [], { order: { column: 'price', ascending: true } })
       setShippingMethods((data || []).map((s: any) => ({ id: s.id, name: s.name, price: s.price.toString(), delivery_time: s.delivery_time, free_shipping_threshold: s.free_shipping_threshold?.toString() || '' })))
     } catch { }
   }
@@ -161,12 +161,12 @@ export default function AdminSettings() {
     const m = shippingMethods[index]
     try {
       if (m.id) {
-        await supabase.from('shipping_methods').update({
+        await adminApi.update('shipping_methods', {
           name: m.name, price: parseFloat(m.price), delivery_time: m.delivery_time,
           free_shipping_threshold: m.free_shipping_threshold ? parseFloat(m.free_shipping_threshold) : null
-        }).eq('id', m.id)
+        }, [{ method: 'eq', column: 'id', value: m.id }])
       } else {
-        await supabase.from('shipping_methods').insert({
+        await adminApi.insert('shipping_methods', {
           name: m.name, price: parseFloat(m.price), delivery_time: m.delivery_time,
           free_shipping_threshold: m.free_shipping_threshold ? parseFloat(m.free_shipping_threshold) : null
         })
@@ -178,7 +178,7 @@ export default function AdminSettings() {
   const deleteShipping = async (index: number) => {
     const m = shippingMethods[index]
     if (m.id) {
-      await supabase.from('shipping_methods').delete().eq('id', m.id)
+      await adminApi.delete('shipping_methods', [{ method: 'eq', column: 'id', value: m.id }])
     }
     setShippingMethods(prev => prev.filter((_, i) => i !== index))
     toast('Shipping method removed', 'info')
@@ -199,13 +199,13 @@ export default function AdminSettings() {
     try {
       const data = { heading: slideForm.heading, subheading: slideForm.subheading || null, cta_text: slideForm.cta_text || null, cta_link: slideForm.cta_link || null, image_url: slideForm.image_url, is_active: slideForm.is_active, sort_order: editingSlide?.sort_order || heroSlides.length }
       if (editingSlide) {
-        await supabase.from('hero_slides').update(data).eq('id', editingSlide.id)
+        await adminApi.update('hero_slides', data, [{ method: 'eq', column: 'id', value: editingSlide.id }])
       } else {
-        await supabase.from('hero_slides').insert(data)
+        await adminApi.insert('hero_slides', data)
       }
       toast('Slide saved', 'success')
       setSlideModal(false)
-      const { data: slides } = await supabase.from('hero_slides').select('*').order('sort_order')
+      const slides = await adminApi.select('hero_slides', [], { order: { column: 'sort_order', ascending: true } })
       setHeroSlides((slides || []) as HeroSlide[])
     } catch { toast('Save failed', 'error') }
   }
@@ -213,10 +213,10 @@ export default function AdminSettings() {
   const deleteSlide = async () => {
     if (!deleteSlideTarget) return
     try {
-      await supabase.from('hero_slides').delete().eq('id', deleteSlideTarget.id)
+      await adminApi.delete('hero_slides', [{ method: 'eq', column: 'id', value: deleteSlideTarget.id }])
       toast('Slide deleted', 'success')
       setDeleteSlideTarget(null)
-      const { data: slides } = await supabase.from('hero_slides').select('*').order('sort_order')
+      const slides = await adminApi.select('hero_slides', [], { order: { column: 'sort_order', ascending: true } })
       setHeroSlides((slides || []) as HeroSlide[])
     } catch { toast('Delete failed', 'error') }
   }
