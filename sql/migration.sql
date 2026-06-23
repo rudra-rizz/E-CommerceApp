@@ -1,6 +1,17 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Storefront customers (lightweight sign-in, no Supabase Auth)
+CREATE TABLE IF NOT EXISTS storefront_customers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL UNIQUE,
+  full_name TEXT,
+  phone TEXT,
+  address TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Create custom types
 DO $$ BEGIN
   CREATE TYPE user_role AS ENUM ('customer', 'admin');
@@ -338,6 +349,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE SEQUENCE IF NOT EXISTS orders_seq START 10000;
+
+DROP TRIGGER IF EXISTS generate_order_number_trigger ON orders;
+CREATE TRIGGER generate_order_number_trigger BEFORE INSERT ON orders FOR EACH ROW EXECUTE FUNCTION generate_order_number();
 
 -- TRIGGER: decrement stock on order
 CREATE OR REPLACE FUNCTION decrement_stock_on_order()

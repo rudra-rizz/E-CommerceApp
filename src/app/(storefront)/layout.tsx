@@ -6,11 +6,13 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Header } from '@/components/storefront/Header'
 import { Footer } from '@/components/storefront/Footer'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
+import { SignInProvider } from '@/context/SignInContext'
 
 export default function StorefrontLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
 
   return (
+    <SignInProvider>
     <div className="flex flex-col min-h-screen">
       <Header />
       <main className="flex-1">
@@ -29,5 +31,6 @@ export default function StorefrontLayout({ children }: { children: ReactNode }) 
       <Footer />
       <CartDrawer />
     </div>
+    </SignInProvider>
   )
 }

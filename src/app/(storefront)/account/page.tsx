@@ -16,12 +16,18 @@ const fadeUp = {
 }
 
 export default function AccountDashboardPage() {
-  const { user, profile } = useAuth()
+  const { user, profile, lightCustomer } = useAuth()
   const [recentOrders, setRecentOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
 
+  const displayName = profile?.full_name || lightCustomer?.full_name || user?.email?.split('@')[0] || ''
+  const displayEmail = user?.email || lightCustomer?.email || ''
+
   useEffect(() => {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
     const fetchOrders = async () => {
       const { data } = await supabase
         .from('orders')
@@ -46,9 +52,9 @@ export default function AccountDashboardPage() {
     <div className="space-y-8">
       <motion.div initial="hidden" animate="visible" variants={fadeUp}>
         <h2 className="font-serif text-2xl font-bold mb-1">
-          Welcome back{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!
+          Welcome{displayName ? ` back, ${displayName.split(' ')[0]}` : ''}!
         </h2>
-        <p className="text-sm text-[#6B6B6B]">{user?.email}</p>
+        {displayEmail && <p className="text-sm text-[#6B6B6B]">{displayEmail}</p>}
       </motion.div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -117,5 +123,3 @@ export default function AccountDashboardPage() {
     </div>
   )
 }
-
-

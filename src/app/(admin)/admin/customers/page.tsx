@@ -3,17 +3,19 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Search, Users } from 'lucide-react'
+import { Search, Users, Mail } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { adminApi } from '@/lib/admin-fetch'
+import { supabase } from '@/lib/supabase'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { Profile } from '@/types'
+import type { Profile, StorefrontCustomer } from '@/types'
 
 export default function AdminCustomers() {
   const router = useRouter()
   const [customers, setCustomers] = useState<(Profile & { order_count?: number; total_spent?: number })[]>([])
+  const [lightCustomers, setLightCustomers] = useState<StorefrontCustomer[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [sortField, setSortField] = useState('created_at')
@@ -23,10 +25,10 @@ export default function AdminCustomers() {
 
   useEffect(() => {
     loadCustomers()
+    loadLightCustomers()
   }, [])
 
   async function loadCustomers() {
-    setLoading(true)
     try {
       const profiles = await adminApi.select('profiles', [{ method: 'eq', column: 'role', value: 'customer' }], { order: { column: 'created_at', ascending: false } })
       const list = (profiles || []) as Profile[]
@@ -47,6 +49,18 @@ export default function AdminCustomers() {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadLightCustomers() {
+    try {
+      const { data } = await supabase
+        .from('storefront_customers')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (data) setLightCustomers(data as StorefrontCustomer[])
+    } catch (err) {
+      console.error(err)
     }
   }
 
@@ -81,7 +95,7 @@ export default function AdminCustomers() {
   )
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <h1 className="text-xl font-bold text-[#1A1A1A]">Customers</h1>
 
       <div className="relative max-w-sm">
@@ -94,65 +108,122 @@ export default function AdminCustomers() {
         />
       </div>
 
-      <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[rgba(0,0,0,0.06)]">
-                <th className="p-3 text-left font-medium text-[#6B6B6B]">Customer</th>
-                <th className="p-3 text-left font-medium text-[#6B6B6B] cursor-pointer select-none" onClick={() => toggleSort('order_count')}>
-                  Orders {sortField === 'order_count' && (sortDir === 'asc' ? '↑' : '↓')}
-                </th>
-                <th className="p-3 text-left font-medium text-[#6B6B6B] cursor-pointer select-none" onClick={() => toggleSort('total_spent')}>
-                  Total Spent {sortField === 'total_spent' && (sortDir === 'asc' ? '↑' : '↓')}
-                </th>
-                <th className="p-3 text-left font-medium text-[#6B6B6B] cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
-                  Joined {sortField === 'created_at' && (sortDir === 'asc' ? '↑' : '↓')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map((customer) => (
-                <motion.tr
-                  key={customer.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="border-b border-[rgba(0,0,0,0.04)] hover:bg-[#F8F9FA] transition-colors cursor-pointer"
-                  onClick={() => router.push(`/admin/customers/${customer.id}`)}
-                >
-                  <td className="p-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-[#2563EB]/10 flex items-center justify-center text-[#2563EB] font-semibold text-sm">
-                        {(customer.full_name || customer.email).charAt(0).toUpperCase()}
+      {/* Registered Customers */}
+      <div>
+        <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3 flex items-center gap-2">
+          <Users className="w-4 h-4 text-[#2563EB]" />
+          Registered Customers
+        </h2>
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[rgba(0,0,0,0.06)]">
+                  <th className="p-3 text-left font-medium text-[#6B6B6B]">Customer</th>
+                  <th className="p-3 text-left font-medium text-[#6B6B6B] cursor-pointer select-none" onClick={() => toggleSort('order_count')}>
+                    Orders {sortField === 'order_count' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th className="p-3 text-left font-medium text-[#6B6B6B] cursor-pointer select-none" onClick={() => toggleSort('total_spent')}>
+                    Total Spent {sortField === 'total_spent' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th className="p-3 text-left font-medium text-[#6B6B6B] cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
+                    Joined {sortField === 'created_at' && (sortDir === 'asc' ? '↑' : '↓')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((customer) => (
+                  <motion.tr
+                    key={customer.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="border-b border-[rgba(0,0,0,0.04)] hover:bg-[#F8F9FA] transition-colors cursor-pointer"
+                    onClick={() => router.push(`/admin/customers/${customer.id}`)}
+                  >
+                    <td className="p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#2563EB]/10 flex items-center justify-center text-[#2563EB] font-semibold text-sm">
+                          {(customer.full_name || customer.email).charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-medium text-[#1A1A1A]">{customer.full_name || 'No name'}</p>
+                          <p className="text-xs text-[#6B6B6B]">{customer.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-[#1A1A1A]">{customer.full_name || 'No name'}</p>
-                        <p className="text-xs text-[#6B6B6B]">{customer.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-3 font-medium">{customer.order_count}</td>
-                  <td className="p-3 font-semibold">{formatCurrency(customer.total_spent || 0)}</td>
-                  <td className="p-3 text-[#6B6B6B]">{format(parseISO(customer.created_at), 'MMM d, yyyy')}</td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="p-3 font-medium">{customer.order_count}</td>
+                    <td className="p-3 font-semibold">{formatCurrency(customer.total_spent || 0)}</td>
+                    <td className="p-3 text-[#6B6B6B]">{format(parseISO(customer.created_at), 'MMM d, yyyy')}</td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {paginated.length === 0 && (
+            <div className="text-center py-12 text-[#6B6B6B]">No registered customers found</div>
+          )}
         </div>
-        {paginated.length === 0 && (
-          <div className="text-center py-12 text-[#6B6B6B]">No customers found</div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 text-sm rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40">Prev</button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button key={i} onClick={() => setPage(i)} className={cn('px-3 py-1.5 text-sm rounded-lg', page === i ? 'bg-[#2563EB] text-white' : 'hover:bg-[#F5F5F0]')}>{i + 1}</button>
+            ))}
+            <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 text-sm rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40">Next</button>
+          </div>
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 text-sm rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40">Prev</button>
-          {Array.from({ length: totalPages }, (_, i) => (
-            <button key={i} onClick={() => setPage(i)} className={cn('px-3 py-1.5 text-sm rounded-lg', page === i ? 'bg-[#2563EB] text-white' : 'hover:bg-[#F5F5F0]')}>{i + 1}</button>
-          ))}
-          <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 text-sm rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40">Next</button>
+      {/* Storefront (Light) Customers */}
+      <div>
+        <h2 className="text-lg font-semibold text-[#1A1A1A] mb-3 flex items-center gap-2">
+          <Mail className="w-4 h-4 text-[#16A34A]" />
+          Quick Sign-In Customers
+        </h2>
+        <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[rgba(0,0,0,0.06)]">
+                  <th className="p-3 text-left font-medium text-[#6B6B6B]">Customer</th>
+                  <th className="p-3 text-left font-medium text-[#6B6B6B]">Phone</th>
+                  <th className="p-3 text-left font-medium text-[#6B6B6B]">Address</th>
+                  <th className="p-3 text-left font-medium text-[#6B6B6B]">Signed Up</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lightCustomers.map((customer) => (
+                  <motion.tr
+                    key={customer.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="border-b border-[rgba(0,0,0,0.04)] hover:bg-[#F8F9FA] transition-colors"
+                  >
+                    <td className="p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#16A34A]/10 flex items-center justify-center text-[#16A34A] font-semibold text-sm">
+                          {(customer.full_name || customer.email).charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-medium text-[#1A1A1A]">{customer.full_name || 'No name'}</p>
+                          <p className="text-xs text-[#6B6B6B]">{customer.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-3 text-[#6B6B6B]">{customer.phone || '—'}</td>
+                    <td className="p-3 text-[#6B6B6B] max-w-[200px] truncate">{customer.address || '—'}</td>
+                    <td className="p-3 text-[#6B6B6B]">{format(parseISO(customer.created_at), 'MMM d, yyyy')}</td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {lightCustomers.length === 0 && (
+            <div className="text-center py-12 text-[#6B6B6B]">No quick sign-in customers yet</div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

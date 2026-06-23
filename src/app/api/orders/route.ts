@@ -1,6 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'Order ID is required' }, { status: 400 })
+    }
+
+    const supabase = supabaseAdmin()
+    const { error } = await supabase.from('orders').delete().eq('id', id)
+    if (error) throw error
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Order delete error:', error)
+    return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const { orderId, payment_status, razorpay_payment_id } = await request.json()
+    if (!orderId) {
+      return NextResponse.json({ error: 'orderId is required' }, { status: 400 })
+    }
+
+    const supabase = supabaseAdmin()
+    const updateData: Record<string, any> = { payment_status }
+
+    if (razorpay_payment_id) {
+      updateData.razorpay_payment_id = razorpay_payment_id
+    }
+
+    const { error } = await supabase.from('orders').update(updateData).eq('id', orderId)
+    if (error) throw error
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Order update error:', error)
+    return NextResponse.json({ error: 'Failed to update order' }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const {
@@ -103,9 +147,12 @@ export async function POST(request: NextRequest) {
     const shipCost = shipping_cost || 0
     const total = Math.round((amountAfterDiscount + taxAmount + shipCost) * 100) / 100
 
+    const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`
+
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
+        order_number: orderNumber,
         user_id: user_id || null,
         email,
         shipping_address: shipping_address || null,

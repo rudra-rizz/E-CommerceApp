@@ -4,9 +4,10 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, ShoppingBag, User, Menu, X, Heart, ChevronDown } from 'lucide-react'
+import { Search, ShoppingBag, User, Menu, X, Heart, ChevronDown, LogIn } from 'lucide-react'
 import { useCart } from '@/context/CartContext'
 import { useAuth } from '@/context/AuthContext'
+import { useSignIn } from '@/context/SignInContext'
 import { cn } from '@/lib/utils'
 
 const navLinks = [
@@ -20,7 +21,11 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const { itemCount, openCart } = useCart()
-  const { user, profile } = useAuth()
+  const { user, profile, lightCustomer } = useAuth()
+  const { openSignIn } = useSignIn()
+
+  const displayName = profile?.full_name || lightCustomer?.full_name || user?.email?.split('@')[0] || ''
+  const isSignedIn = !!(user || lightCustomer)
 
   return (
     <header className="sticky top-0 z-40 bg-[#FAFAFA]/90 backdrop-blur-md border-b border-[rgba(0,0,0,0.06)]">
@@ -63,21 +68,31 @@ export function Header() {
               <Search className="w-5 h-5" />
             </button>
 
-            {user ? (
-              <Link
-                href="/account/wishlist"
-                className="p-2.5 rounded-xl hover:bg-[#F5F5F0] transition-colors text-[#6B6B6B] hover:text-[#1A1A1A] hidden sm:block"
+            {isSignedIn ? (
+              <>
+                <Link
+                  href="/account/wishlist"
+                  className="p-2.5 rounded-xl hover:bg-[#F5F5F0] transition-colors text-[#6B6B6B] hover:text-[#1A1A1A] hidden sm:block"
+                >
+                  <Heart className="w-5 h-5" />
+                </Link>
+                <Link
+                  href="/account"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-[#F5F5F0] transition-colors text-[#6B6B6B] hover:text-[#1A1A1A]"
+                >
+                  <User className="w-5 h-5" />
+                  <span className="text-sm font-medium max-w-[100px] truncate">{displayName}</span>
+                </Link>
+              </>
+            ) : (
+              <button
+                onClick={openSignIn}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-[#F5F5F0] transition-colors text-[#6B6B6B] hover:text-[#1A1A1A]"
               >
-                <Heart className="w-5 h-5" />
-              </Link>
-            ) : null}
-
-            <Link
-              href={user ? '/account' : '/account'}
-              className="p-2.5 rounded-xl hover:bg-[#F5F5F0] transition-colors text-[#6B6B6B] hover:text-[#1A1A1A] hidden sm:block"
-            >
-              <User className="w-5 h-5" />
-            </Link>
+                <LogIn className="w-4 h-4" />
+                <span className="text-sm font-medium">Sign In</span>
+              </button>
+            )}
 
             <button
               onClick={openCart}
@@ -141,22 +156,34 @@ export function Header() {
                   </Link>
                 ))}
                 <hr className="my-2 border-[rgba(0,0,0,0.06)]" />
-                <Link
-                  href="/account"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-4 py-3 rounded-xl text-[#6B6B6B] hover:text-[#1A1A1A] hover:bg-[#F5F5F0] transition-all text-sm font-medium flex items-center gap-3"
-                >
-                  <User className="w-4 h-4" />
-                  Account
-                </Link>
-                <Link
-                  href="/account/wishlist"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-4 py-3 rounded-xl text-[#6B6B6B] hover:text-[#1A1A1A] hover:bg-[#F5F5F0] transition-all text-sm font-medium flex items-center gap-3"
-                >
-                  <Heart className="w-4 h-4" />
-                  Wishlist
-                </Link>
+                {isSignedIn ? (
+                  <>
+                    <Link
+                      href="/account"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="px-4 py-3 rounded-xl text-[#6B6B6B] hover:text-[#1A1A1A] hover:bg-[#F5F5F0] transition-all text-sm font-medium flex items-center gap-3"
+                    >
+                      <User className="w-4 h-4" />
+                      Account
+                    </Link>
+                    <Link
+                      href="/account/wishlist"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="px-4 py-3 rounded-xl text-[#6B6B6B] hover:text-[#1A1A1A] hover:bg-[#F5F5F0] transition-all text-sm font-medium flex items-center gap-3"
+                    >
+                      <Heart className="w-4 h-4" />
+                      Wishlist
+                    </Link>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => { setMobileMenuOpen(false); openSignIn() }}
+                    className="w-full px-4 py-3 rounded-xl text-[#6B6B6B] hover:text-[#1A1A1A] hover:bg-[#F5F5F0] transition-all text-sm font-medium flex items-center gap-3"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    Sign In
+                  </button>
+                )}
               </nav>
             </motion.div>
           </motion.div>
@@ -205,6 +232,7 @@ export function Header() {
           </motion.div>
         )}
       </AnimatePresence>
+
     </header>
   )
 }

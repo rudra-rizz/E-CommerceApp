@@ -3,13 +3,15 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Search, Filter, ShoppingCart, ChevronDown } from 'lucide-react'
+import { Search, Filter, ShoppingCart, ChevronDown, Trash2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { adminApi } from '@/lib/admin-fetch'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Modal } from '@/components/ui/modal'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useToast } from '@/components/ui/toast'
 import type { Order } from '@/types'
 
 const paymentColors: Record<string, string> = {
@@ -29,6 +31,7 @@ const fulfillmentColors: Record<string, string> = {
 
 export default function AdminOrders() {
   const router = useRouter()
+  const { toast } = useToast()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -37,11 +40,30 @@ export default function AdminOrders() {
   const [sortField, setSortField] = useState('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
+  const [deleteTarget, setDeleteTarget] = useState<Order | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const perPage = 20
 
   useEffect(() => {
     loadOrders()
   }, [])
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/orders?id=${deleteTarget.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to delete order')
+      setOrders(prev => prev.filter(o => o.id !== deleteTarget.id))
+      toast('Order deleted successfully', 'success')
+    } catch (err) {
+      toast('Failed to delete order', 'error')
+    } finally {
+      setDeleting(false)
+      setDeleteTarget(null)
+    }
+  }
 
   async function loadOrders() {
     setLoading(true)
@@ -147,6 +169,7 @@ export default function AdminOrders() {
                 </th>
                 <th className="p-3 text-left font-medium text-[#6B6B6B]">Payment</th>
                 <th className="p-3 text-left font-medium text-[#6B6B6B]">Fulfillment</th>
+                <th className="p-3 text-right font-medium text-[#6B6B6B]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -173,6 +196,15 @@ export default function AdminOrders() {
                       {order.fulfillment_status}
                     </span>
                   </td>
+                  <td className="p-3 text-right">
+                    <button
+                      onClick={e => { e.stopPropagation(); setDeleteTarget(order) }}
+                      className="p-2 rounded-lg text-[#6B6B6B] hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Delete order"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
                 </motion.tr>
               ))}
             </tbody>
@@ -192,6 +224,31 @@ export default function AdminOrders() {
           <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 text-sm rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40">Next</button>
         </div>
       )}
+      {/* Delete Confirmation */}
+      <Modal isOpen={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} size="sm">
+        <div className="p-6 text-center">
+          <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+            <Trash2 className="w-6 h-6 text-red-600" />
+          </div>
+          <h3 className="text-lg font-bold mb-2">Delete Order</h3>
+          <p className="text-sm text-[#6B6B6B] mb-6">
+            Are you sure you want to delete order <strong>#{deleteTarget?.order_number}</strong>? This action cannot be undone.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleDelete}
+              loading={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
